@@ -1,0 +1,615 @@
+---
+import historyData26 from '../data/election_history.json';
+import historyData21 from '../data/election_history_2021.json';
+
+// Configuration
+const svgWidth = 800;
+const svgHeight = 350;
+const paddingLeft = 60;
+const paddingRight = 40;
+const paddingTop = 30;
+const paddingBottom = 40;
+
+const chartWidth = svgWidth - paddingLeft - paddingRight;
+const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+// 2026 Data
+const fujimoriPoints26 = historyData26.fujimori;
+const sanchezPoints26 = historyData26.sanchez;
+const pointsCount26 = fujimoriPoints26.length;
+
+// 2021 Data
+const fujimoriPoints21 = historyData21.fujimori;
+const castilloPoints21 = historyData21.castillo;
+const pointsCount21 = fujimoriPoints21.length;
+
+// Map data points to SVG coordinates
+function getCoordinates(points: { t: number; p: number }[], totalPoints: number) {
+  return points.map((pt, idx) => {
+    const x = paddingLeft + (idx / (totalPoints - 1)) * chartWidth;
+    const y = svgHeight - paddingBottom - pt.p * chartHeight;
+    return { x, y, price: pt.p, time: pt.t };
+  });
+}
+
+const fujimoriCoords26 = getCoordinates(fujimoriPoints26, pointsCount26);
+const sanchezCoords26 = getCoordinates(sanchezPoints26, pointsCount26);
+
+const fujimoriCoords21 = getCoordinates(fujimoriPoints21, pointsCount21);
+const castilloCoords21 = getCoordinates(castilloPoints21, pointsCount21);
+
+// Generate SVG Path definitions
+function generatePath(coords: { x: number; y: number }[]) {
+  if (coords.length === 0) return '';
+  return coords.reduce((path, pt, idx) => {
+    return path + (idx === 0 ? `M ${pt.x} ${pt.y}` : ` L ${pt.x} ${pt.y}`);
+  }, '');
+}
+
+// Generate Area Path definition (for gradient fill under the line)
+function generateAreaPath(coords: { x: number; y: number }[]) {
+  if (coords.length === 0) return '';
+  const linePath = generatePath(coords);
+  const firstX = coords[0].x;
+  const lastX = coords[coords.length - 1].x;
+  const baselineY = svgHeight - paddingBottom;
+  return `${linePath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+}
+
+// 2026 Initial Path Strings
+const fujimoriPath26 = generatePath(fujimoriCoords26);
+const sanchezPath26 = generatePath(sanchezCoords26);
+const fujimoriAreaPath26 = generateAreaPath(fujimoriCoords26);
+const sanchezAreaPath26 = generateAreaPath(sanchezCoords26);
+
+// 2021 Initial Path Strings
+const fujimoriPath21 = generatePath(fujimoriCoords21);
+const castilloPath21 = generatePath(castilloCoords21);
+const fujimoriAreaPath21 = generateAreaPath(fujimoriCoords21);
+const castilloAreaPath21 = generateAreaPath(castilloCoords21);
+
+// Generate Y-axis grid labels (0%, 25%, 50%, 75%, 100%)
+const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+// Generate X-axis labels helper (5 dates equally spaced)
+function getXTicks(points: { t: number; p: number }[], totalPoints: number) {
+  const xTicksCount = 5;
+  return Array.from({ length: xTicksCount }, (_, i) => {
+    const idx = Math.floor((i / (xTicksCount - 1)) * (totalPoints - 1));
+    const pt = points[idx];
+    const date = new Date(pt.t * 1000);
+    const formattedDate = date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+    const x = paddingLeft + (idx / (totalPoints - 1)) * chartWidth;
+    return { x, label: formattedDate };
+  });
+}
+
+const xTicks26 = getXTicks(fujimoriPoints26, pointsCount26);
+const xTicks21 = getXTicks(fujimoriPoints21, pointsCount21);
+---
+
+<div class="g-card election-chart-container" style="position: relative;">
+  <div class="chart-header">
+    <div>
+      <h3 style="font-size: 1.25rem; font-weight: 600; color: #ffffff;" id="chartTitle">Tendencia en Polymarket (Últimos 30 días)</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted);" id="chartSubtitle">Probabilidades implícitas de victoria basadas en el precio de los contratos YES</p>
+    </div>
+    
+    <!-- Year Toggles (Google Pill Tabs) -->
+    <div class="chart-tabs">
+      <button class="chart-tab active" data-year="2026">Elección 2026</button>
+      <button class="chart-tab" data-year="2021">Elección 2021</button>
+    </div>
+  </div>
+
+  <div class="chart-sub-header">
+    <!-- Legend -->
+    <div class="chart-legend">
+      <div class="legend-item">
+        <span class="legend-dot" style="background-color: var(--g-blue); box-shadow: 0 0 8px var(--g-blue);"></span>
+        <span>Keiko Fujimori (YES / Apuesta)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot" style="background-color: var(--g-green); box-shadow: 0 0 8px var(--g-green);" id="legendOpponentDot"></span>
+        <span id="legendOpponentText">Roberto Sánchez (YES)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="svg-wrapper">
+    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} class="interactive-svg" id="electionSvg">
+      <defs>
+        <!-- Gradients for Area Fills -->
+        <linearGradient id="fujimoriGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--g-blue)" stop-opacity="0.25"></stop>
+          <stop offset="100%" stop-color="var(--g-blue)" stop-opacity="0.00"></stop>
+        </linearGradient>
+        <linearGradient id="opponentGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--g-green)" stop-opacity="0.25"></stop>
+          <stop offset="100%" stop-color="var(--g-green)" stop-opacity="0.00"></stop>
+        </linearGradient>
+      </defs>
+
+      <!-- Y-Axis Gridlines & Labels -->
+      {yTicks.map(val => {
+        const y = svgHeight - paddingBottom - val * chartHeight;
+        return (
+          <g class="grid-line-group">
+            <line x1={paddingLeft} y1={y} x2={svgWidth - paddingRight} y2={y} stroke="var(--color-surface-variant)" stroke-dasharray="4,4" stroke-width="1" />
+            <text x={paddingLeft - 10} y={y + 4} fill="var(--text-muted)" font-size="11" text-anchor="end">
+              {Math.round(val * 100)}%
+            </text>
+          </g>
+        );
+      })}
+
+      <!-- X-Axis Labels (Pre-rendered for 2026, updated dynamically via client script) -->
+      {xTicks26.map((tick, idx) => (
+        <text x={tick.x} y={svgHeight - paddingBottom + 20} class="x-axis-tick" data-idx={idx} fill="var(--text-muted)" font-size="11" text-anchor="middle">
+          {tick.label}
+        </text>
+      ))}
+
+      <!-- Area Fills (under the curves) -->
+      <path id="fujimoriAreaPath" d={fujimoriAreaPath26} fill="url(#fujimoriGradient)" style="transition: var(--transition-normal); transition-property: d;" />
+      <path id="opponentAreaPath" d={sanchezAreaPath26} fill="url(#opponentGradient)" style="transition: var(--transition-normal); transition-property: d;" />
+
+      <!-- Chart Lines -->
+      <path id="fujimoriLinePath" d={fujimoriPath26} fill="none" stroke="var(--g-blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition: var(--transition-normal); transition-property: d;" />
+      <path id="opponentLinePath" d={sanchezPath26} fill="none" stroke="var(--g-green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition: var(--transition-normal); transition-property: d;" />
+
+      <!-- Interactive elements (hidden by default) -->
+      <line id="selectorLine" x1="0" y1={paddingTop} x2="0" y2={svgHeight - paddingBottom} stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="3,3" style="display: none; pointer-events: none;" />
+      
+      <circle id="fujimoriMarker" r="6" fill="var(--bg-main)" stroke="var(--g-blue)" stroke-width="3" style="display: none; pointer-events: none;" />
+      <circle id="opponentMarker" r="6" fill="var(--bg-main)" stroke="var(--g-green)" stroke-width="3" style="display: none; pointer-events: none;" />
+    </svg>
+
+    <!-- HTML Tooltip for High Fidelity Details -->
+    <div id="chartTooltip" class="chart-tooltip" style="display: none; position: absolute; pointer-events: none;">
+      <div class="tooltip-date" id="tooltipDate">9 Jun 2026</div>
+      <div class="tooltip-row">
+        <span class="tooltip-dot" style="background-color: var(--g-blue);"></span>
+        <span class="tooltip-name">Fujimori:</span>
+        <span class="tooltip-value" id="tooltipFujimori">95.5%</span>
+      </div>
+      <div class="tooltip-row">
+        <span class="tooltip-dot" style="background-color: var(--g-green);" id="tooltipOpponentDot"></span>
+        <span class="tooltip-name" id="tooltipOpponentName">Sánchez:</span>
+        <span class="tooltip-value" id="tooltipOpponentValue">4.4%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Send coordinates data to the client -->
+<div 
+  id="chartDataBridge" 
+  data-fujimori-2026={JSON.stringify(fujimoriCoords26)} 
+  data-sanchez-2026={JSON.stringify(sanchezCoords26)}
+  data-fujimori-2021={JSON.stringify(fujimoriCoords21)}
+  data-castillo-2021={JSON.stringify(castilloCoords21)}
+  data-ticks-2026={JSON.stringify(xTicks26)}
+  data-ticks-2021={JSON.stringify(xTicks21)}
+  data-padding-left={paddingLeft}
+  data-chart-width={chartWidth}
+  data-points-count-2026={pointsCount26}
+  data-points-count-2021={pointsCount21}
+  style="display: none;"
+></div>
+
+<style>
+  .election-chart-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 16px;
+  }
+
+  .chart-sub-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  
+  /* Tabs system inspired by Google Material Design 3 */
+  .chart-tabs {
+    background-color: var(--color-surface-container);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-full);
+    padding: 4px;
+    display: flex;
+    gap: 4px;
+  }
+
+  .chart-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 8px 18px;
+    border-radius: var(--border-radius-full);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .chart-tab:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .chart-tab.active {
+    background-color: var(--g-blue-light);
+    color: var(--g-blue);
+    border: 1px solid rgba(138, 180, 248, 0.25);
+  }
+  
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-main);
+  }
+  
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--border-radius-full);
+  }
+  
+  .svg-wrapper {
+    position: relative;
+    width: 100%;
+  }
+  
+  .interactive-svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Tooltip styling matching Google style */
+  .chart-tooltip {
+    background-color: var(--color-surface-container);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    padding: 10px 14px;
+    box-shadow: var(--shadow-md);
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+    transition: transform 0.05s ease-out;
+  }
+  
+  .tooltip-date {
+    font-weight: 500;
+    color: #ffffff;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+  
+  .tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .tooltip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--border-radius-full);
+  }
+  
+  .tooltip-name {
+    color: var(--text-muted);
+  }
+  
+  .tooltip-value {
+    font-weight: 700;
+    margin-left: auto;
+  }
+</style>
+
+<script>
+  // Client-side interactivity and tab switching
+  document.addEventListener('DOMContentLoaded', () => {
+    const bridge = document.getElementById('chartDataBridge');
+    const svg = document.getElementById('electionSvg') as unknown as SVGSVGElement;
+    const selectorLine = document.getElementById('selectorLine');
+    const fujimoriMarker = document.getElementById('fujimoriMarker');
+    const opponentMarker = document.getElementById('opponentMarker');
+    const tooltip = document.getElementById('chartTooltip');
+    
+    const tooltipDate = document.getElementById('tooltipDate');
+    const tooltipFujimori = document.getElementById('tooltipFujimori');
+    const tooltipOpponentValue = document.getElementById('tooltipOpponentValue');
+    const tooltipOpponentName = document.getElementById('tooltipOpponentName');
+    
+    // Tab toggles & text updates
+    const tabs = document.querySelectorAll('.chart-tab');
+    const chartTitle = document.getElementById('chartTitle');
+    const chartSubtitle = document.getElementById('chartSubtitle');
+    const legendOpponentText = document.getElementById('legendOpponentText');
+    const ticksText = document.querySelectorAll('.x-axis-tick');
+
+    // SVG elements to mutate
+    const fujimoriLinePath = document.getElementById('fujimoriLinePath');
+    const opponentLinePath = document.getElementById('opponentLinePath');
+    const fujimoriAreaPath = document.getElementById('fujimoriAreaPath');
+    const opponentAreaPath = document.getElementById('opponentAreaPath');
+
+    if (!bridge || !svg || !selectorLine || !fujimoriMarker || !opponentMarker || !tooltip) return;
+
+    // Parse data from bridge
+    const data2026 = {
+      fujimori: JSON.parse(bridge.getAttribute('data-fujimori-2026') || '[]'),
+      opponent: JSON.parse(bridge.getAttribute('data-sanchez-2026') || '[]'),
+      ticks: JSON.parse(bridge.getAttribute('data-ticks-2026') || '[]'),
+      pointsCount: parseInt(bridge.getAttribute('data-points-count-2026') || '150'),
+      opponentName: "Sánchez",
+      opponentFull: "Roberto Sánchez (YES)",
+      title: "Tendencia en Polymarket (Últimos 30 días - 2026)",
+      subtitle: "Probabilidades implícitas de victoria basadas en el precio de los contratos YES",
+      paths: {
+        fujimoriLine: fujimoriLinePath?.getAttribute('d') || '',
+        opponentLine: opponentLinePath?.getAttribute('d') || '',
+        fujimoriArea: fujimoriAreaPath?.getAttribute('d') || '',
+        opponentArea: opponentAreaPath?.getAttribute('d') || ''
+      }
+    };
+
+    // Calculate path coordinates for 2021
+    const coordsFujimori21 = JSON.parse(bridge.getAttribute('data-fujimori-2021') || '[]');
+    const coordsCastillo21 = JSON.parse(bridge.getAttribute('data-castillo-2021') || '[]');
+    const ticks21 = JSON.parse(bridge.getAttribute('data-ticks-2021') || '[]');
+    const pointsCount21 = parseInt(bridge.getAttribute('data-points-count-2021') || '150');
+
+    // Generate Path helper
+    function generatePathString(coords: { x: number; y: number }[]) {
+      if (coords.length === 0) return '';
+      return coords.reduce((path, pt, idx) => {
+        return path + (idx === 0 ? `M ${pt.x} ${pt.y}` : ` L ${pt.x} ${pt.y}`);
+      }, '');
+    }
+
+    function generateAreaPathString(coords: { x: number; y: number }[]) {
+      if (coords.length === 0) return '';
+      const linePath = generatePathString(coords);
+      const firstX = coords[0].x;
+      const lastX = coords[coords.length - 1].x;
+      const baselineY = svg.viewBox.baseVal.height - 40; // paddingBottom = 40
+      return `${linePath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+    }
+
+    const data2021 = {
+      fujimori: coordsFujimori21,
+      opponent: coordsCastillo21,
+      ticks: ticks21,
+      pointsCount: pointsCount21,
+      opponentName: "Castillo",
+      opponentFull: "Pedro Castillo (Apuesta)",
+      title: "Tendencia de Apuestas en 2021 (Betsson / Inkabet)",
+      subtitle: "Probabilidades implícitas de victoria reconstruidas a partir de cuotas de apuestas de segunda vuelta",
+      paths: {
+        fujimoriLine: generatePathString(coordsFujimori21),
+        opponentLine: generatePathString(coordsCastillo21),
+        fujimoriArea: generateAreaPathString(coordsFujimori21),
+        opponentArea: generateAreaPathString(coordsCastillo21)
+      }
+    };
+
+    const paddingLeft = parseFloat(bridge.getAttribute('data-padding-left') || '60');
+    const chartWidth = parseFloat(bridge.getAttribute('data-chart-width') || '700');
+
+    // State
+    let currentYear = '2026';
+    let currentData = data2026;
+
+    // Switch Year Function
+    function setYear(year: string) {
+      currentYear = year;
+      currentData = year === '2026' ? data2026 : data2021;
+
+      // Update active tab styles
+      tabs.forEach(t => {
+        if (t.getAttribute('data-year') === year) {
+          t.classList.add('active');
+        } else {
+          t.classList.remove('active');
+        }
+      });
+
+      // Update texts
+      if (chartTitle) chartTitle.textContent = currentData.title;
+      if (chartSubtitle) chartSubtitle.textContent = currentData.subtitle;
+      if (legendOpponentText) legendOpponentText.textContent = currentData.opponentFull;
+      if (tooltipOpponentName) tooltipOpponentName.textContent = `${currentData.opponentName}:`;
+
+      // Update SVG Line and Area paths
+      fujimoriLinePath?.setAttribute('d', currentData.paths.fujimoriLine);
+      opponentLinePath?.setAttribute('d', currentData.paths.opponentLine);
+      fujimoriAreaPath?.setAttribute('d', currentData.paths.fujimoriArea);
+      opponentAreaPath?.setAttribute('d', currentData.paths.opponentArea);
+
+      // Update X-axis tick labels
+      ticksText.forEach((tick, idx) => {
+        const tickData = currentData.ticks[idx];
+        if (tickData) {
+          tick.textContent = tickData.label;
+          tick.setAttribute('x', tickData.x.toString());
+        }
+      });
+
+      // Hide active tooltip and selector elements on transition
+      selectorLine?.setAttribute('style', 'display: none;');
+      fujimoriMarker?.setAttribute('style', 'display: none;');
+      opponentMarker?.setAttribute('style', 'display: none;');
+      if (tooltip) tooltip.style.display = 'none';
+    }
+
+    // Attach click listeners to tabs
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const year = tab.getAttribute('data-year') || '2026';
+        if (year !== currentYear) {
+          setYear(year);
+        }
+      });
+    });
+
+    // Handle mouse interactions on SVG
+    function handleInteraction(clientX: number, clientY: number) {
+      const rect = svg.getBoundingClientRect();
+      const mouseX = ((clientX - rect.left) / rect.width) * svg.viewBox.baseVal.width;
+      
+      const relX = mouseX - paddingLeft;
+      let idx = Math.round((relX / chartWidth) * (currentData.pointsCount - 1));
+      
+      if (idx < 0) idx = 0;
+      if (idx >= currentData.pointsCount) idx = currentData.pointsCount - 1;
+      
+      const fPt = currentData.fujimori[idx];
+      const oPt = currentData.opponent[idx];
+
+      if (!fPt || !oPt) return;
+
+      // Update interactive SVG markers and line
+      selectorLine?.setAttribute('x1', fPt.x.toString());
+      selectorLine?.setAttribute('x2', fPt.x.toString());
+      selectorLine?.setAttribute('style', 'display: block; pointer-events: none;');
+
+      fujimoriMarker?.setAttribute('cx', fPt.x.toString());
+      fujimoriMarker?.setAttribute('cy', fPt.y.toString());
+      fujimoriMarker?.setAttribute('style', 'display: block; pointer-events: none;');
+
+      opponentMarker?.setAttribute('cx', oPt.x.toString());
+      opponentMarker?.setAttribute('cy', oPt.y.toString());
+      opponentMarker?.setAttribute('style', 'display: block; pointer-events: none;');
+
+      // Format date
+      const date = new Date(fPt.time * 1000);
+      const formattedDate = date.toLocaleDateString('es-PE', { 
+        day: '2-digit', 
+        month: 'long', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Helper to calculate realistic betting odds (decimal quotes) from probabilities
+      function calculateOdds(prob: number) {
+        if (prob <= 0.005) return '—';
+        // Applying a standard bookmaker margin of ~7% (overround)
+        const odds = 0.93 / prob;
+        return odds.toFixed(2);
+      }
+
+      // Update Tooltip values
+      if (tooltipDate) tooltipDate.textContent = formattedDate;
+      
+      if (currentYear === '2026') {
+        if (tooltipFujimori) tooltipFujimori.textContent = `${(fPt.price * 100).toFixed(1)}% ($${fPt.price.toFixed(2)})`;
+        if (tooltipOpponentValue) tooltipOpponentValue.textContent = `${(oPt.price * 100).toFixed(1)}% ($${oPt.price.toFixed(2)})`;
+      } else {
+        const fOdds = calculateOdds(fPt.price);
+        const oOdds = calculateOdds(oPt.price);
+        if (tooltipFujimori) tooltipFujimori.textContent = `${(fPt.price * 100).toFixed(1)}% (Cuota: ${fOdds})`;
+        if (tooltipOpponentValue) tooltipOpponentValue.textContent = `${(oPt.price * 100).toFixed(1)}% (Cuota: ${oOdds})`;
+      }
+
+      // Position Tooltip
+      const wrapper = svg.parentElement;
+      if (!wrapper) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      
+      const px = ((fPt.x / svg.viewBox.baseVal.width) * wrapperRect.width);
+      const py = ((fPt.y / svg.viewBox.baseVal.height) * wrapperRect.height);
+
+      let tooltipX = px + 15;
+      if (px > wrapperRect.width * 0.7) {
+        tooltipX = px - tooltip.offsetWidth - 15;
+      }
+      
+      tooltip.style.left = `${tooltipX}px`;
+      tooltip.style.top = `${py - 20}px`;
+      tooltip.style.display = 'flex';
+    }
+
+    svg.addEventListener('mousemove', (e) => {
+      handleInteraction(e.clientX, e.clientY);
+    });
+
+    svg.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    svg.addEventListener('mouseleave', () => {
+      selectorLine?.setAttribute('style', 'display: none;');
+      fujimoriMarker?.setAttribute('style', 'display: none;');
+      opponentMarker?.setAttribute('style', 'display: none;');
+      if (tooltip) tooltip.style.display = 'none';
+    });
+    
+    svg.addEventListener('touchend', () => {
+      selectorLine?.setAttribute('style', 'display: none;');
+      fujimoriMarker?.setAttribute('style', 'display: none;');
+      opponentMarker?.setAttribute('style', 'display: none;');
+      if (tooltip) tooltip.style.display = 'none';
+    });
+
+    // Listen for custom live updates from the parent page
+    window.addEventListener('polymarket-live-update', (e: any) => {
+      const { fujimori: fPrice, sanchez: sPrice } = e.detail;
+      
+      const lastIdx = data2026.pointsCount - 1;
+      if (data2026.fujimori[lastIdx] && data2026.opponent[lastIdx]) {
+        // Update price values
+        data2026.fujimori[lastIdx].price = fPrice;
+        data2026.opponent[lastIdx].price = sPrice;
+        
+        // Recalculate Y coordinates
+        const baselineY = svg.viewBox.baseVal.height - 40;
+        const chartHeightVal = svg.viewBox.baseVal.height - 30 - 40; // svgHeight - paddingTop - paddingBottom
+        
+        data2026.fujimori[lastIdx].y = baselineY - fPrice * chartHeightVal;
+        data2026.opponent[lastIdx].y = baselineY - sPrice * chartHeightVal;
+        
+        // Regenerate path strings
+        data2026.paths.fujimoriLine = generatePathString(data2026.fujimori);
+        data2026.paths.opponentLine = generatePathString(data2026.opponent);
+        data2026.paths.fujimoriArea = generateAreaPathString(data2026.fujimori);
+        data2026.paths.opponentArea = generateAreaPathString(data2026.opponent);
+        
+        // Apply if showing 2026
+        if (currentYear === '2026') {
+          fujimoriLinePath?.setAttribute('d', data2026.paths.fujimoriLine);
+          opponentLinePath?.setAttribute('d', data2026.paths.opponentLine);
+          fujimoriAreaPath?.setAttribute('d', data2026.paths.fujimoriArea);
+          opponentAreaPath?.setAttribute('d', data2026.paths.opponentArea);
+        }
+      }
+    });
+  });
+</script>

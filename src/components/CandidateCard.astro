@@ -1,0 +1,185 @@
+---
+interface Props {
+  name: string;
+  party: string;
+  votes?: string;
+  percentage: string;
+  color: string;
+  bgColor: string;
+  initials: string;
+  polymarketPrice?: string;
+  statusText?: string;
+  statusType?: 'success' | 'warning' | 'info' | 'error';
+  priceId?: string;
+}
+
+const { 
+  name, 
+  party, 
+  votes, 
+  percentage, 
+  color, 
+  bgColor, 
+  initials, 
+  polymarketPrice,
+  statusText,
+  statusType = 'info',
+  priceId
+} = Astro.props;
+---
+
+<div class="candidate-card g-card">
+  <div class="avatar-container" style={`background-color: ${bgColor}; border: 2px solid ${color};`}>
+    <span class="avatar-text" style={`color: ${color};`}>{initials}</span>
+  </div>
+  
+  <div class="candidate-details">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+      <div>
+        <h3 class="candidate-name">{name}</h3>
+        <p class="candidate-party">{party}</p>
+      </div>
+      {statusText && (
+        <span class={`g-chip ${
+          statusType === 'success' ? 'g-chip-green' : 
+          statusType === 'warning' ? 'g-chip-yellow' : 
+          statusType === 'error' ? 'g-chip-red' : 'g-chip-blue'
+        }`} style="font-size: 0.75rem; padding: 4px 10px;">
+          {statusText}
+        </span>
+      )}
+    </div>
+    
+    <div class="metrics-grid">
+      <div class="metric-block">
+        <span class="metric-label">Votos Oficiales (ONPE)</span>
+        <div class="metric-value-row">
+          <span class="metric-percentage" style={`color: ${color};`}>{percentage}</span>
+          {votes && <span class="metric-votes">({votes} votos)</span>}
+        </div>
+      </div>
+      
+      {polymarketPrice !== undefined && (
+        <div class="metric-block polymarket-block">
+          <span class="metric-label">Probabilidad Polymarket (Contratos YES)</span>
+          <div class="metric-value-row">
+            <span class="metric-market-price" id={priceId}>{polymarketPrice}</span>
+            <span class="g-chip g-chip-blue" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Mercado</span>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+
+<style>
+  .candidate-card {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    min-height: 140px;
+  }
+  
+  .avatar-container {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--border-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .avatar-text {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+  }
+  
+  .candidate-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .candidate-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .candidate-party {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  
+  .metrics-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 12px;
+  }
+  
+  .metric-block {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .polymarket-block {
+    border-left: 1px solid var(--color-border);
+    padding-left: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .candidate-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .polymarket-block {
+      border-left: none;
+      padding-left: 0;
+      border-top: 1px solid var(--color-border);
+      padding-top: 12px;
+    }
+  }
+  
+  .metric-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  
+  .metric-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .metric-percentage {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  
+  .metric-votes {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  
+  .metric-market-price {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--g-blue);
+  }
+</style>
