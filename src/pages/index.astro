@@ -29,29 +29,30 @@ const election2021 = {
   }
 };
 
-// 2026 Election Data (ONPE 94% Counted + Polymarket Live Price Snapshot)
+// 2026 Election Data — valores iniciales reales (se refrescan EN VIVO vía /api/data).
+// Última instantánea conocida; el script cliente los reemplaza al cargar y cada 30s.
 const election2026 = {
   sanchez: {
     name: "Roberto Sánchez",
     party: "Juntos por el Perú",
-    votes: "En conteo (94%)",
-    percentage: "50.015%",
+    votes: "9,016,443",
+    percentage: "50.024%",
     initials: "RS",
     color: "#81c995", // Google Green
     bgColor: "rgba(129, 201, 149, 0.12)",
-    polymarketPrice: "4.4%",
+    polymarketPrice: "4.9%",
     statusText: "Líder Técnico (ONPE)",
     statusType: "warning" as const
   },
   fujimori: {
     name: "Keiko Fujimori",
     party: "Fuerza Popular",
-    votes: "En conteo (94%)",
-    percentage: "49.985%",
+    votes: "9,007,934",
+    percentage: "49.976%",
     initials: "KF",
     color: "#8ab4f8", // Google Blue
     bgColor: "rgba(138, 180, 248, 0.12)",
-    polymarketPrice: "95.5%",
+    polymarketPrice: "95.2%",
     statusText: "Favorito (Polymarket)",
     statusType: "success" as const
   }
@@ -82,10 +83,10 @@ const election2026 = {
         <div class="summary-stat-card">
           <span class="stat-year">2026</span>
           <div class="stat-row">
-            <span class="stat-label">Margen Actual (94%):</span>
-            <span class="stat-val color-yellow">0.03% (~5,000 votos)</span>
+            <span class="stat-label">Margen Actual (<span id="actas-pct-label">97.9%</span> actas):</span>
+            <span class="stat-val color-yellow" id="margin-2026">0.048% (8,509 votos)</span>
           </div>
-          <p class="stat-desc">Roberto Sánchez lidera el conteo oficial, pero Polymarket cotiza a Keiko Fujimori con 95.5% de probabilidad de ganar.</p>
+          <p class="stat-desc">Roberto Sánchez lidera el conteo oficial, pero Polymarket cotiza a Keiko Fujimori con <span id="poly-desc-2026">95.2%</span> de probabilidad de ganar.</p>
         </div>
       </div>
     </div>
@@ -99,14 +100,20 @@ const election2026 = {
         <span class="live-dot-pulse"></span>
       </span>
       <div>
-        <h4 style="font-size: 0.95rem; font-weight: 600; color: #ffffff;">Conexión de Datos en Vivo (Polymarket API)</h4>
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="update-timestamp">Última actualización: Cargado con datos iniciales</p>
+        <h4 style="font-size: 0.95rem; font-weight: 600; color: #ffffff;">Datos en Vivo · ONPE (oficial) + Polymarket (mercado)</h4>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="update-timestamp">Conectando con datos en vivo…</p>
       </div>
     </div>
-    <button class="g-btn-live" id="btn-update-live">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="refresh-icon"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-      <span>Actualizar Datos en Vivo</span>
-    </button>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <button class="g-btn-live" id="btn-update-live">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="refresh-icon"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span>Actualizar Datos en Vivo</span>
+      </button>
+      <button class="g-btn-live" id="btn-send-whatsapp" style="background-color: #25d366; color: #121212;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        <span>Enviar Reporte WhatsApp</span>
+      </button>
+    </div>
   </div>
 
   <!-- Side-by-Side Comparison -->
@@ -175,6 +182,8 @@ const election2026 = {
           statusText={election2026.sanchez.statusText}
           statusType={election2026.sanchez.statusType}
           priceId="price-sanchez-2026"
+          percentageId="pct-sanchez-2026"
+          votesId="votes-sanchez-2026"
         />
         
         <CandidateCard 
@@ -189,13 +198,15 @@ const election2026 = {
           statusText={election2026.fujimori.statusText}
           statusType={election2026.fujimori.statusType}
           priceId="price-fujimori-2026"
+          percentageId="pct-fujimori-2026"
+          votesId="votes-fujimori-2026"
         />
       </div>
       
       <div class="context-box">
         <h4>Contexto y Apuestas 2026:</h4>
         <p>
-          El conteo oficial muestra una ventaja mínima de Sánchez al 94% (50.015% vs. 49.985%). Sin embargo, en Polymarket, Keiko Fujimori domina con 95.5%, reflejando que los apostadores anticipan que el ingreso del voto extranjero restante y los fallos de las 500,000 actas impugnadas por el JNE ratificarán su victoria.
+          El conteo oficial muestra una ventaja mínima de Sánchez (al <span id="actas-pct-prose">97.9%</span> de actas). Sin embargo, en Polymarket, Keiko Fujimori domina con <span id="poly-prose-2026">95.2%</span>, reflejando que los apostadores anticipan que el ingreso del voto restante y los fallos de las actas observadas por el JEE/JNE ratificarán su victoria.
         </p>
       </div>
     </div>
@@ -255,88 +266,174 @@ const election2026 = {
   document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('btn-update-live');
     const timestamp = document.getElementById('update-timestamp');
-    const sanchezPriceSpan = document.getElementById('price-sanchez-2026');
-    const fujimoriPriceSpan = document.getElementById('price-fujimori-2026');
 
-    if (!btn || !timestamp) return;
+    // Endpoint del bot local que proxya ONPE (oficial) + Polymarket con la data más fresca.
+    const DATA_API = 'http://localhost:3001/api/data';
+    const REFRESH_MS = 30000; // auto-refresh cada 30s
+    const $ = (id: string) => document.getElementById(id);
 
-    async function fetchLiveOdds() {
-      btn!.classList.add('loading');
-      btn!.setAttribute('disabled', 'true');
-      const textSpan = btn!.querySelector('span');
-      if (textSpan) textSpan.textContent = 'Conectando con API...';
+    const setText = (id: string, value: string, flash = true) => {
+      const el = $(id);
+      if (!el || el.textContent === value) return;
+      el.textContent = value;
+      if (flash) {
+        el.classList.add('live-flash');
+        setTimeout(() => el.classList.remove('live-flash'), 1000);
+      }
+    };
 
+    const nf = new Intl.NumberFormat('es-PE');
+
+    // --- Aplicar datos de ONPE (conteo oficial) a la UI ---
+    function applyOnpe(onpe: any) {
+      if (!onpe || !Array.isArray(onpe.candidatos)) return false;
+      const byName = (needle: string) =>
+        onpe.candidatos.find((c: any) => (c.candidato || '').toUpperCase().includes(needle));
+      const s = byName('SANCHEZ') || byName('SÁNCHEZ');
+      const f = byName('FUJIMORI');
+
+      if (s) {
+        setText('pct-sanchez-2026', `${Number(s.pct).toFixed(3)}%`);
+        setText('votes-sanchez-2026', `(${nf.format(s.votos)} votos)`);
+      }
+      if (f) {
+        setText('pct-fujimori-2026', `${Number(f.pct).toFixed(3)}%`);
+        setText('votes-fujimori-2026', `(${nf.format(f.votos)} votos)`);
+      }
+      if (onpe.actasContabilizadas != null) {
+        const actas = `${Number(onpe.actasContabilizadas).toFixed(1)}%`;
+        setText('actas-pct-label', actas, false);
+        setText('actas-pct-prose', actas, false);
+      }
+      if (s && f) {
+        const marginPct = Math.abs(Number(s.pct) - Number(f.pct)).toFixed(3);
+        setText('margin-2026', `${marginPct}% (${nf.format(onpe.diferenciaVotos)} votos)`);
+      }
+      return true;
+    }
+
+    // --- Aplicar datos de Polymarket (probabilidad de mercado) a la UI + gráfico ---
+    function applyPolymarket(pm: any) {
+      if (!pm) return false;
+      const fPrice = pm.fujimori, sPrice = pm.sanchez;
+      if (fPrice != null) {
+        const txt = `${(fPrice * 100).toFixed(1)}%`;
+        setText('price-fujimori-2026', txt);
+        setText('poly-desc-2026', txt, false);
+        setText('poly-prose-2026', txt, false);
+      }
+      if (sPrice != null) setText('price-sanchez-2026', `${(sPrice * 100).toFixed(1)}%`);
+      if (fPrice != null && sPrice != null) {
+        window.dispatchEvent(new CustomEvent('polymarket-live-update', {
+          detail: { fujimori: fPrice, sanchez: sPrice }
+        }));
+      }
+      return true;
+    }
+
+    // Respaldo si el bot local no está corriendo: Polymarket directo desde el navegador.
+    async function fetchPolymarketDirect() {
+      const res = await fetch('https://gamma-api.polymarket.com/events?slug=peru-presidential-election-winner');
+      if (!res.ok) throw new Error('Polymarket API failed');
+      const data = await res.json();
+      const ev = Array.isArray(data) ? data[0] : data;
+      const markets = ev?.markets || [];
+      const priceOf = (m: any) => {
+        try { return parseFloat(JSON.parse(m.outcomePrices)[0]); }
+        catch { return m.lastTradePrice != null ? parseFloat(m.lastTradePrice) : null; }
+      };
+      const k = markets.find((m: any) => (m.slug || '').includes('keiko') || (m.slug || '').includes('fujimori'));
+      const r = markets.find((m: any) => (m.slug || '').includes('roberto') && ((m.slug || '').includes('snchez') || (m.slug || '').includes('sanchez')));
+      return { fujimori: k ? priceOf(k) : null, sanchez: r ? priceOf(r) : null };
+    }
+
+    let refreshing = false;
+    async function refreshData(manual = false) {
+      if (refreshing) return;
+      refreshing = true;
+      const textSpan = btn?.querySelector('span');
+      if (manual && btn) {
+        btn.classList.add('loading');
+        btn.setAttribute('disabled', 'true');
+        if (textSpan) textSpan.textContent = 'Actualizando…';
+      }
       try {
-        const url = 'https://gamma-api.polymarket.com/public-search?q=Peru';
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('API request failed');
-        const data = await res.json();
-        
-        if (data.events && data.events.length > 0) {
-          const event0 = data.events[0];
-          if (event0.markets) {
-            const kFujimori = event0.markets.find((m: any) => m.slug.includes('keiko-fujimori'));
-            const rSanchez = event0.markets.find((m: any) => m.slug.includes('roberto-snchez'));
-            
-            let fPrice = 0.955; // defaults
-            let sPrice = 0.044;
-            
-            if (kFujimori) {
-              if (kFujimori.outcomePrices) {
-                const prices = JSON.parse(kFujimori.outcomePrices);
-                fPrice = parseFloat(prices[0]);
-              } else if (kFujimori.lastTradePrice) {
-                fPrice = parseFloat(kFujimori.lastTradePrice);
-              }
-              if (fujimoriPriceSpan) {
-                fujimoriPriceSpan.textContent = `${(fPrice * 100).toFixed(1)}%`;
-                fujimoriPriceSpan.classList.add('live-flash');
-                setTimeout(() => fujimoriPriceSpan.classList.remove('live-flash'), 1000);
-              }
-            }
-            
-            if (rSanchez) {
-              if (rSanchez.outcomePrices) {
-                const prices = JSON.parse(rSanchez.outcomePrices);
-                sPrice = parseFloat(prices[0]);
-              } else if (rSanchez.lastTradePrice) {
-                sPrice = parseFloat(rSanchez.lastTradePrice);
-              }
-              if (sanchezPriceSpan) {
-                sanchezPriceSpan.textContent = `${(sPrice * 100).toFixed(1)}%`;
-                sanchezPriceSpan.classList.add('live-flash');
-                setTimeout(() => sanchezPriceSpan.classList.remove('live-flash'), 1000);
-              }
-            }
-            
-            // Dispatch live update to the SVG chart
-            window.dispatchEvent(new CustomEvent('polymarket-live-update', { 
-              detail: { fujimori: fPrice, sanchez: sPrice } 
-            }));
-            
-            const now = new Date();
-            timestamp!.textContent = `Última actualización en vivo: Hoy a las ${now.toLocaleTimeString('es-PE')}`;
-            
-            // Visual indicator success on the button
-            if (textSpan) textSpan.textContent = '¡Datos Actualizados!';
-            setTimeout(() => {
-              if (textSpan) textSpan.textContent = 'Actualizar Datos en Vivo';
-            }, 1500);
-          }
+        const res = await fetch(DATA_API, { cache: 'no-store' });
+        if (!res.ok) throw new Error('bot no disponible');
+        const snap = await res.json();
+        const okOnpe = applyOnpe(snap.onpe);
+        applyPolymarket(snap.polymarket);
+
+        const now = new Date().toLocaleTimeString('es-PE');
+        if (okOnpe && snap.onpe?.fechaActualizacion) {
+          const onpeTime = new Date(snap.onpe.fechaActualizacion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+          if (timestamp) timestamp.textContent = `En vivo · ${now} — ONPE al ${onpeTime}`;
+        } else if (timestamp) {
+          timestamp.textContent = `Polymarket en vivo · ${now} — ONPE no disponible`;
         }
+        if (manual && textSpan) textSpan.textContent = '¡Actualizado!';
       } catch (err) {
-        console.error("Error updating live prices:", err);
-        timestamp!.textContent = "Error de red al actualizar. Reintente en un momento.";
-        if (textSpan) textSpan.textContent = 'Reintentar actualización';
+        // Bot local apagado → al menos refrescar Polymarket directo.
+        try {
+          const pm = await fetchPolymarketDirect();
+          applyPolymarket(pm);
+          const now = new Date().toLocaleTimeString('es-PE');
+          if (timestamp) timestamp.textContent = `Polymarket en vivo · ${now} — (ONPE oficial requiere el bot local activo)`;
+          if (manual && textSpan) textSpan.textContent = '¡Polymarket actualizado!';
+        } catch (e) {
+          if (timestamp) timestamp.textContent = 'Sin conexión a las fuentes de datos. Reintentando…';
+          if (manual && textSpan) textSpan.textContent = 'Reintentar';
+        }
       } finally {
-        setTimeout(() => {
-          btn!.classList.remove('loading');
-          btn!.removeAttribute('disabled');
-        }, 500);
+        refreshing = false;
+        if (manual && btn) {
+          setTimeout(() => {
+            btn.classList.remove('loading');
+            btn.removeAttribute('disabled');
+            const ts = btn.querySelector('span');
+            if (ts) ts.textContent = 'Actualizar Datos en Vivo';
+          }, 1200);
+        }
       }
     }
 
-    btn.addEventListener('click', fetchLiveOdds);
+    if (btn) btn.addEventListener('click', () => refreshData(true));
+
+    // Arranque inmediato + auto-refresh continuo (tiempo real).
+    refreshData(false);
+    setInterval(() => refreshData(false), REFRESH_MS);
+
+    // Lógica para enviar el reporte de WhatsApp de forma manual
+    const waBtn = document.getElementById('btn-send-whatsapp');
+    if (waBtn) {
+      waBtn.addEventListener('click', async () => {
+        waBtn.setAttribute('disabled', 'true');
+        const originalText = waBtn.querySelector('span')?.textContent || '';
+        const textSpan = waBtn.querySelector('span');
+        if (textSpan) textSpan.textContent = 'Enviando Reporte...';
+        
+        try {
+          const res = await fetch('http://localhost:3001/api/trigger', {
+            method: 'POST'
+          });
+          const result = await res.json();
+          if (res.ok && result.success) {
+            if (textSpan) textSpan.textContent = '¡Reporte Enviado!';
+            alert('El reporte electoral fue enviado con éxito a los números de WhatsApp configurados.');
+          } else {
+            throw new Error(result.error || 'Error al procesar el reporte.');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error: Asegúrate de que el bot de Node.js esté corriendo (node scripts/onpe_scraper_whatsapp.js) y las API keys configuradas en tu archivo .env.');
+        } finally {
+          setTimeout(() => {
+            waBtn.removeAttribute('disabled');
+            if (textSpan) textSpan.textContent = originalText;
+          }, 2000);
+        }
+      });
+    }
   });
 </script>
 

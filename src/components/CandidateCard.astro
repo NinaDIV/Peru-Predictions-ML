@@ -11,20 +11,24 @@ interface Props {
   statusText?: string;
   statusType?: 'success' | 'warning' | 'info' | 'error';
   priceId?: string;
+  percentageId?: string;
+  votesId?: string;
 }
 
-const { 
-  name, 
-  party, 
-  votes, 
-  percentage, 
-  color, 
-  bgColor, 
-  initials, 
+const {
+  name,
+  party,
+  votes,
+  percentage,
+  color,
+  bgColor,
+  initials,
   polymarketPrice,
   statusText,
   statusType = 'info',
-  priceId
+  priceId,
+  percentageId,
+  votesId
 } = Astro.props;
 ---
 
@@ -54,8 +58,8 @@ const {
       <div class="metric-block">
         <span class="metric-label">Votos Oficiales (ONPE)</span>
         <div class="metric-value-row">
-          <span class="metric-percentage" style={`color: ${color};`}>{percentage}</span>
-          {votes && <span class="metric-votes">({votes} votos)</span>}
+          <span class="metric-percentage" id={percentageId} style={`color: ${color};`}>{percentage}</span>
+          {votes && <span class="metric-votes" id={votesId}>({votes} votos)</span>}
         </div>
       </div>
       
